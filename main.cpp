@@ -2,7 +2,7 @@
  * @Author: MT
  * @Date: 2024-03-25 17:36:47
  * @FilePath: /threadpool/main.cpp
- * @LastEditTime: 2024-03-25 17:59:26
+ * @LastEditTime: 2024-03-25 19:44:07
  * @LastEditors: MT
  * @copyright: asensing.co
  */
@@ -94,5 +94,14 @@ int main()
     //     std::cout << "result is [" << result.get() << "]\n" << std::endl;
     // }
     //***********get return value test***********//
+
+    //***********lambda test***********//
+    ThreadPool pool(20,60);
+    pool.submit([](){ test_9(); });
+    pool.submit((test_9));
+    pool.submit(std::move(test_9));
+    
+    //***********lambda test***********//
+
     return 0;
 }
