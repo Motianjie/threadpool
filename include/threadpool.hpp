@@ -2,7 +2,7 @@
  * @Author: MT
  * @Date: 2024-03-25 09:56:39
  * @FilePath: /threadpool/include/threadpool.hpp
- * @LastEditTime: 2024-03-25 17:58:34
+ * @LastEditTime: 2024-03-26 17:48:15
  * @LastEditors: MT
  * @copyright: asensing.co
  */
@@ -14,6 +14,7 @@
 #include <future>
 #include <vector>
 #include <queue>
+#include <iostream>
 
 /**
  * @description: 任务类，优先级数值越小，优先级越高,优先级为0~255
@@ -152,6 +153,7 @@ inline ThreadPool::ThreadPool(std::uint32_t numThreads,std::uint32_t max_numThre
 inline ThreadPool::~ThreadPool()
 {
     stop();
+    std::cout << "ThreadPool::~ThreadPool() " << std::endl;
 }
 
 inline void ThreadPool::thread_work_func()
@@ -166,10 +168,17 @@ inline void ThreadPool::thread_work_func()
             {
                 return; // 退出线程的循环
             }
-            task = std::move(workQueue.top());
-            workQueue.pop();
+            if(!workQueue.empty())
+            {
+                task = std::move(workQueue.top());
+                workQueue.pop();
+            }
         }
-        (*task)();
+        if(task.get())
+        {
+            (*task)();
+        }
+            
     }
 }
 
