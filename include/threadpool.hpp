@@ -2,7 +2,7 @@
  * @Author: MT
  * @Date: 2024-03-25 09:56:39
  * @FilePath: /threadpool/include/threadpool.hpp
- * @LastEditTime: 2024-03-25 17:58:34
+ * @LastEditTime: 2024-03-26 10:16:08
  * @LastEditors: MT
  * @copyright: asensing.co
  */
@@ -77,6 +77,7 @@ struct priority_cmp
 class ThreadPool 
 {
 public:
+    ThreadPool() = delete;
     ThreadPool(const ThreadPool& other) = delete;
     ThreadPool& operator=(const ThreadPool& other) = delete;
     ThreadPool(ThreadPool&& other) = delete;
