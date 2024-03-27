@@ -1,8 +1,8 @@
 /*
  * @Author: MT
  * @Date: 2024-03-25 09:56:39
- * @FilePath: /threadpool/include/threadpool.hpp
- * @LastEditTime: 2024-03-27 10:05:05
+ * @FilePath: /threadpool_soam/threadpool/threadpool.hpp
+ * @LastEditTime: 2024-03-27 14:48:06
  * @LastEditors: MT
  * @copyright: asensing.co
  */
@@ -15,6 +15,19 @@
 #include <vector>
 #include <queue>
 #include <iostream>
+#include "spdlog/spdlog.h"
+
+/**
+ * @description: 线程创建模式
+ * @Date: 2024-03-27 14:37:03
+ * @Author: Motianjie 13571951237@163.com
+ */
+enum class mode : uint8_t
+{
+    latency = 0x00, //延迟创建模式，对象创建时不创建线程，等到有任务注入时创建
+    immediate = 0x01,//立即创建模式，对象创建时立即创建线程
+};
+
 
 /**
  * @description: 任务类，优先级数值越小，优先级越高,优先级为0~255
@@ -82,9 +95,10 @@ public:
     ThreadPool& operator=(const ThreadPool& other) = delete;
     ThreadPool(ThreadPool&& other) = delete;
 
-    ThreadPool(std::uint32_t numThreads = std::thread::hardware_concurrency(),std::uint32_t max_numThreads = 4 * std::thread::hardware_concurrency());
+    ThreadPool(const std::string& name="", mode mode_ = mode::immediate,std::uint32_t numThreads = std::thread::hardware_concurrency(),std::uint32_t max_numThreads = 4 * std::thread::hardware_concurrency());
     ~ThreadPool();
 
+public:
     /**
      * @description: 提交任务至线程池
      * @param {F&&}
@@ -112,7 +126,9 @@ private:
      * @Date: 2024-03-25 16:10:33
      * @Author: motianjie motianjie@asensing.com
      */
-    void thread_work_func();
+    void thread_work_func(int thread_id);
+
+    void add_work_thread(int thread_id);
 
     /**
      * @description: 初始化创建线程
@@ -131,6 +147,8 @@ private:
     void stop();
 
 private:
+    std::string name_m;
+    std::vector<std::thread> work_threads_m; //工作线程池
     std::uint32_t current_thread_num_m; //当前线程数量
     std::uint32_t max_thread_num_m;     //最大线程数量
 
@@ -141,13 +159,16 @@ private:
     std::mutex mutex;
     std::condition_variable condition;
     std::atomic<bool> stopflag;
+
 };
 
-inline ThreadPool::ThreadPool(std::uint32_t numThreads,std::uint32_t max_numThreads) :  current_thread_num_m(numThreads),
-                                                                                        max_thread_num_m(max_numThreads),
-                                                                                        stopflag(false)
+inline ThreadPool::ThreadPool(const std::string& name,mode mode_,std::uint32_t numThreads,std::uint32_t max_numThreads) :   name_m(name),
+                                                                                                                            current_thread_num_m(numThreads),
+                                                                                                                            max_thread_num_m(max_numThreads),
+                                                                                                                            stopflag(false)
 {
-    start();
+    if(mode_ == mode::immediate)  
+        start();
 }
 
 inline ThreadPool::~ThreadPool()
@@ -156,8 +177,10 @@ inline ThreadPool::~ThreadPool()
     std::cout << "ThreadPool::~ThreadPool() " << std::endl;
 }
 
-inline void ThreadPool::thread_work_func()
+inline void ThreadPool::thread_work_func(int thread_id)
 {
+    std::string thread_name = "tp_" + name_m + "_" + std::to_string(thread_id);
+    pthread_setname_np(pthread_self(),thread_name.c_str());
     while (true) 
     {
         std::shared_ptr<task_event> task;
@@ -199,26 +222,37 @@ inline void ThreadPool::submit_taskevent(std::shared_ptr<task_event> te)
     if(stopflag.load())    
         return;
     
+    start();
     std::lock_guard<std::mutex> lock(mutex);
     workQueue.push(std::move(te));
     auto size = workQueue.size();
-    if(size > current_thread_num_m && size <= max_thread_num_m) //如果任务队列大小比线程池线程数量大，证明线程池处理不过来，需要新增线程处理
+    while(size > current_thread_num_m && current_thread_num_m < max_thread_num_m)
     {
-        while(size > current_thread_num_m)
-        {
-            std::cout << "!!!!warning!!!! add thread task queue size: " << size << " > " << "threadnum: " << current_thread_num_m << std::endl; 
-            threads.emplace_back(std::thread([this] { thread_work_func(); }));
-            current_thread_num_m = threads.size();
-        }
-    }   
+        SPDLOG_WARN("thread pool add work thread task queue size:[{}] > threadnum:[{}]",size,current_thread_num_m);
+        add_work_thread(current_thread_num_m);
+        current_thread_num_m = threads.size();
+    }
+    if(size > max_thread_num_m)
+    {
+        SPDLOG_WARN("thread pool [{}] task queue size overflow [{}] maxthreadnum[{}]",name_m,size,max_thread_num_m);
+    }
     condition.notify_one();
+}
+
+inline void ThreadPool::add_work_thread(int thread_id)
+{
+    SPDLOG_INFO("thread pool [{}] create thread [{}]",name_m,thread_id);    
+    threads.emplace_back(std::thread([this,thread_id] { thread_work_func(thread_id); }));
 }
 
 inline void ThreadPool::start() 
 {
-    for (size_t i = 0; i < current_thread_num_m; ++i) //创建线程
+    if(threads.empty())
     {
-        threads.emplace_back(std::thread([this] { thread_work_func(); }));
+        for (size_t i = 0; i < current_thread_num_m; ++i) //创建线程
+        {
+            add_work_thread(i);
+        }
     }
 }
 
