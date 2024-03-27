@@ -2,13 +2,14 @@
  * @Author: MT
  * @Date: 2024-03-25 17:36:47
  * @FilePath: /threadpool/main.cpp
- * @LastEditTime: 2024-03-25 19:44:07
+ * @LastEditTime: 2024-03-27 10:07:30
  * @LastEditors: MT
  * @copyright: asensing.co
  */
 #include "include/threadpool.hpp"
 #include <iostream>
 #include <stdlib.h>
+#include <unistd.h>
 int add(int a, int b) 
 {
     return a + b;
@@ -87,21 +88,29 @@ int main()
     //***********test priority***********//
 
     //***********get return value test***********//
-    // ThreadPool pool;
-    // for (int i = 0; i < 1000; ++i) {
-    //     auto result = pool.submit(add, i, i + 1);
-    //     // 获取任务的返回值
-    //     std::cout << "result is [" << result.get() << "]\n" << std::endl;
-    // }
+    ThreadPool pool;
+    for (int i = 0; i < 8; ++i) {
+        auto result = pool.submit(add, i, i + 1);
+        // 获取任务的返回值
+        std::cout << "result is [" << result.get() << "]\n" << std::endl;
+    }
     //***********get return value test***********//
 
     //***********lambda test***********//
-    ThreadPool pool(20,60);
-    pool.submit([](){ test_9(); });
-    pool.submit((test_9));
-    pool.submit(std::move(test_9));
+    // ThreadPool pool;
+    // pool.submit([](){ test_9(); });
+    // pool.submit((test_9));
+    // pool.submit(std::move(test_9));
     
     //***********lambda test***********//
+
+    //***********stress test***********//
+    ThreadPool pool;
+    for (int i = 0; i < 8; ++i) {
+        auto result = pool.submit(add, i, i + 1);
+        usleep(1*1000);//如果不让出CPU，一直添加任务会触发线程池增加线程数
+    }
+    //***********stress test***********//
 
     return 0;
 }
