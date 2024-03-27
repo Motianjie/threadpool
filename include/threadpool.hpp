@@ -2,7 +2,7 @@
  * @Author: MT
  * @Date: 2024-03-25 09:56:39
  * @FilePath: /threadpool/include/threadpool.hpp
- * @LastEditTime: 2024-03-26 17:48:15
+ * @LastEditTime: 2024-03-27 10:05:05
  * @LastEditors: MT
  * @copyright: asensing.co
  */
@@ -206,6 +206,7 @@ inline void ThreadPool::submit_taskevent(std::shared_ptr<task_event> te)
     {
         while(size > current_thread_num_m)
         {
+            std::cout << "!!!!warning!!!! add thread task queue size: " << size << " > " << "threadnum: " << current_thread_num_m << std::endl; 
             threads.emplace_back(std::thread([this] { thread_work_func(); }));
             current_thread_num_m = threads.size();
         }
