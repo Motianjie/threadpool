@@ -1,8 +1,8 @@
 /*
  * @Author: MT
  * @Date: 2024-03-25 09:56:39
- * @FilePath: /threadpool_soam/threadpool/threadpool.hpp
- * @LastEditTime: 2024-03-27 14:48:06
+ * @FilePath: /src/04_bsw/threadpool/threadpool.hpp
+ * @LastEditTime: 2024-03-27 16:20:44
  * @LastEditors: MT
  * @copyright: asensing.co
  */
@@ -22,7 +22,7 @@
  * @Date: 2024-03-27 14:37:03
  * @Author: Motianjie 13571951237@163.com
  */
-enum class mode : uint8_t
+enum class threadpool_mode : uint8_t
 {
     latency = 0x00, //延迟创建模式，对象创建时不创建线程，等到有任务注入时创建
     immediate = 0x01,//立即创建模式，对象创建时立即创建线程
@@ -81,10 +81,12 @@ struct priority_cmp
 /**
  * @description: 线程池类
  *               1: 支持优先级设定，优先级越高，线程池优先处理 √
- *               2：线程管理：如果所有线程都在忙碌状态，并且队列中还有新的任务等待处理，线程池创建新的线程来处理这些任务 √
+ *               2：线程管理:
+ *                    a:如果所有线程都在忙碌状态，并且队列中还有新的任务等待处理，线程池创建新的线程来处理这些任务 √
+ *                    b:可配置工作线程的启动时机，支持对象创建时启动，支持任务提交时启动
  *               3: 支持返回值获取 √
  * @param numThreads 初始化线程池线程数量
- * @para max_numThreads 线程池线程数量最大值
+ * @param max_numThreads 线程池线程数量最大值
  * @Date: 2024-03-25 16:07:14
  * @Author: motianjie motianjie@asensing.com
  */
@@ -95,7 +97,7 @@ public:
     ThreadPool& operator=(const ThreadPool& other) = delete;
     ThreadPool(ThreadPool&& other) = delete;
 
-    ThreadPool(const std::string& name="", mode mode_ = mode::immediate,std::uint32_t numThreads = std::thread::hardware_concurrency(),std::uint32_t max_numThreads = 4 * std::thread::hardware_concurrency());
+    ThreadPool(const std::string& name="", threadpool_mode mode_ = threadpool_mode::immediate,std::uint32_t numThreads = std::thread::hardware_concurrency(),std::uint32_t max_numThreads = 4 * std::thread::hardware_concurrency());
     ~ThreadPool();
 
 public:
@@ -128,6 +130,13 @@ private:
      */
     void thread_work_func(int thread_id);
 
+    /**
+     * @description: 增加一条工作线程
+     * @param {int} thread_id
+     * @return {*}
+     * @Date: 2024-03-27 16:17:48
+     * @Author: Motianjie 13571951237@163.com
+     */
     void add_work_thread(int thread_id);
 
     /**
@@ -162,12 +171,12 @@ private:
 
 };
 
-inline ThreadPool::ThreadPool(const std::string& name,mode mode_,std::uint32_t numThreads,std::uint32_t max_numThreads) :   name_m(name),
+inline ThreadPool::ThreadPool(const std::string& name,threadpool_mode mode_,std::uint32_t numThreads,std::uint32_t max_numThreads) :   name_m(name),
                                                                                                                             current_thread_num_m(numThreads),
                                                                                                                             max_thread_num_m(max_numThreads),
                                                                                                                             stopflag(false)
 {
-    if(mode_ == mode::immediate)  
+    if(mode_ == threadpool_mode::immediate)  
         start();
 }
 
