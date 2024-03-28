@@ -1,8 +1,8 @@
 /*
  * @Author: MT
  * @Date: 2024-03-25 09:56:39
- * @FilePath: /src/04_bsw/threadpool/threadpool.hpp
- * @LastEditTime: 2024-03-27 16:20:44
+ * @FilePath: /threadpool_soam/threadpool/threadpool.hpp
+ * @LastEditTime: 2024-03-28 18:07:28
  * @LastEditors: MT
  * @copyright: asensing.co
  */
@@ -16,7 +16,7 @@
 #include <queue>
 #include <iostream>
 #include "spdlog/spdlog.h"
-
+#include <atomic>
 /**
  * @description: 线程创建模式
  * @Date: 2024-03-27 14:37:03
@@ -121,6 +121,10 @@ public:
      */    
     void submit_taskevent(std::shared_ptr<task_event> te);
 
+    size_t getter_task_queue_size()const;
+
+    size_t getter_thread_size()const;
+
 private:
     /**
      * @description: 线程工作函数，每个线程单元执行的内容
@@ -165,16 +169,22 @@ private:
     std::priority_queue<std::shared_ptr<task_event>,std::vector<std::shared_ptr<task_event>>,priority_cmp> workQueue;   // task_priority_queue
     
     // synchronization
-    std::mutex mutex;
+    mutable std::mutex mutex;
     std::condition_variable condition;
     std::atomic<bool> stopflag;
+
+    //monitor
+    std::atomic<std::uint64_t> submit_cnt_m;
+    std::atomic<std::uint64_t> execve_cnt_m;
 
 };
 
 inline ThreadPool::ThreadPool(const std::string& name,threadpool_mode mode_,std::uint32_t numThreads,std::uint32_t max_numThreads) :   name_m(name),
-                                                                                                                            current_thread_num_m(numThreads),
-                                                                                                                            max_thread_num_m(max_numThreads),
-                                                                                                                            stopflag(false)
+                                                                                                                                        current_thread_num_m(numThreads),
+                                                                                                                                        max_thread_num_m(max_numThreads),
+                                                                                                                                        stopflag(false),
+                                                                                                                                        submit_cnt_m(0),
+                                                                                                                                        execve_cnt_m(0)
 {
     if(mode_ == threadpool_mode::immediate)  
         start();
@@ -204,6 +214,7 @@ inline void ThreadPool::thread_work_func(int thread_id)
             {
                 task = std::move(workQueue.top());
                 workQueue.pop();
+                execve_cnt_m.fetch_add(1); // execve_cnt++;
             }
         }
         if(task.get())
@@ -231,9 +242,10 @@ inline void ThreadPool::submit_taskevent(std::shared_ptr<task_event> te)
     if(stopflag.load())    
         return;
     
-    start();
+    start(); // 延迟启动线程
     std::lock_guard<std::mutex> lock(mutex);
     workQueue.push(std::move(te));
+    submit_cnt_m.fetch_add(1); // sumbit_cnt++;
     auto size = workQueue.size();
     while(size > current_thread_num_m && current_thread_num_m < max_thread_num_m)
     {
@@ -266,7 +278,7 @@ inline void ThreadPool::start()
 }
 
 inline void ThreadPool::stop() 
-{
+{   
     {
         std::unique_lock<std::mutex> lock(mutex);
         stopflag.store(true);
@@ -277,6 +289,17 @@ inline void ThreadPool::stop()
     {
         thread.join();
     }
+}
+
+inline size_t ThreadPool::getter_task_queue_size()const
+{
+    std::lock_guard<std::mutex> lock(mutex);
+    return workQueue.size();
+}
+
+inline size_t ThreadPool::getter_thread_size()const
+{
+    return threads.size();
 }
 
 #endif
